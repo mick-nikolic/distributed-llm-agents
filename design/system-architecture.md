@@ -111,6 +111,7 @@ The main containers are as follows:
 
 The following design artifacts complement the system architecture by detailing specific implementation views:
 
+- `design/use-case-diagram.md` — UML Use Case Diagram: actors, include/extend/generalization relationships, and per-use-case descriptions. Source: `diagrams/use-case-diagram.puml`.
 - `design/data-model/conceptual-erd.md` — Core domain entities and their relationships at the conceptual level.
 - `design/data-model/logical-erd.md` — Logical data model with attributes, primary keys, and foreign keys.
 - `design/data-model/physical-erd.md` — PostgreSQL-specific physical schema with types, constraints, and indexes.
