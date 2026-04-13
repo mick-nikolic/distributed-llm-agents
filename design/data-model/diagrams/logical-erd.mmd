@@ -1,0 +1,90 @@
+erDiagram
+    direction TB
+
+    AGENT {
+        string agent_id PK
+        string agent_role
+        string llm_model
+        string llm_provider
+        json capabilities
+        string status
+        datetime registered_at
+    }
+
+    TASK {
+        string task_id PK
+        string title
+        text description
+        string complexity_level
+        string status
+        string submitted_by
+        datetime created_at
+        datetime completed_at
+    }
+
+    SUBTASK {
+        string subtask_id PK
+        string task_id FK
+        text description
+        string required_role
+        json dependencies
+        integer sequence_order
+        string status
+        datetime created_at
+    }
+
+    EXECUTION {
+        string execution_id PK
+        string subtask_id FK
+        string agent_id FK
+        json input_context
+        text raw_output
+        integer attempt_number
+        string status
+        datetime started_at
+        datetime completed_at
+    }
+
+    AGENTMESSAGE {
+        string message_id PK
+        string sender_agent_id FK
+        string receiver_agent_id FK
+        string task_id FK
+        string message_type
+        json payload
+        datetime sent_at
+        datetime delivered_at
+    }
+
+    EVALUATIONRESULT {
+        string evaluation_id PK
+        string execution_id FK
+        string evaluator_agent_id FK
+        float hallucination_score
+        float consistency_score
+        text evaluation_notes
+        string verdict
+        datetime evaluated_at
+    }
+
+    CONSENSUSRECORD {
+        string consensus_id PK
+        string task_id FK
+        string subtask_id FK
+        string strategy
+        text final_output
+        json participating_agent_ids
+        float confidence_score
+        datetime resolved_at
+    }
+
+    AGENT ||--o{ EXECUTION : "produces"
+    TASK ||--o{ SUBTASK : "is decomposed into"
+    SUBTASK ||--o{ EXECUTION : "is attempted by"
+    EXECUTION ||--o{ EVALUATIONRESULT : "is assessed by"
+    SUBTASK ||--o| CONSENSUSRECORD : "is resolved into"
+    TASK ||--o{ CONSENSUSRECORD : "accumulates"
+    AGENT ||--o{ AGENTMESSAGE : "sends"
+    AGENT ||--o{ AGENTMESSAGE : "receives"
+    TASK ||--o{ AGENTMESSAGE : "scopes"
+    AGENT ||--o{ EVALUATIONRESULT : "evaluates (as Critic)"

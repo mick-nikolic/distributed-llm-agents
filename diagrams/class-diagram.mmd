@@ -1,0 +1,223 @@
+classDiagram
+    direction TB
+
+    %% ── API Layer ──────────────────────────────────────────
+    class TaskRouter {
+        +submit_task(body: TaskCreate) Task
+        +get_task(task_id: str) Task
+        +get_task_result(task_id: str) ConsensusRecord
+    }
+
+    class AgentRouter {
+        +register_agent(body: AgentCreate) Agent
+        +list_agents() list[Agent]
+        +get_agent_status(agent_id: str) Agent
+    }
+
+    %% ── Orchestration Layer ────────────────────────────────
+    class OrchestratorService {
+        -task_repo: TaskRepository
+        -subtask_repo: SubTaskRepository
+        -decomposer: TaskDecomposer
+        -registry: AgentRegistry
+        -bus: MessageBus
+        +submit_task(task_create: TaskCreate) Task
+        +on_execution_received(execution: Execution) void
+        +resolve_task(task_id: str) Task
+        -schedule_ready_subtasks(task_id: str) void
+    }
+
+    class TaskDecomposer {
+        -strategy: DecompositionStrategy
+        +decompose(task: Task) DAG
+        +validate_dag(dag: DAG) bool
+        +set_strategy(s: DecompositionStrategy) void
+    }
+
+    class DAG {
+        -nodes: list[SubTask]
+        -edges: dict[str, list[str]]
+        +get_ready_nodes() list[SubTask]
+        +mark_completed(subtask_id: str) void
+        +is_complete() bool
+    }
+
+    class AgentRegistry {
+        -agent_repo: AgentRepository
+        +register(agent: AgentCreate) Agent
+        +get_available(role: str) AgentProxy
+        +list_all() list[Agent]
+        +update_status(agent_id: str, status: str) void
+    }
+
+    %% ── Agent Layer ────────────────────────────────────────
+    class AgentProxy {
+        -agent: Agent
+        -bus: MessageBus
+        -timeout_s: int
+        +dispatch(subtask: SubTask) Execution
+        +heartbeat() void
+    }
+
+    class LLMProviderAdapter {
+        <<interface>>
+        +call(prompt: str, context: dict) str
+    }
+
+    class OpenAIAdapter {
+        -api_key: str
+        -model: str
+        +call(prompt: str, context: dict) str
+    }
+
+    class AnthropicAdapter {
+        -api_key: str
+        -model: str
+        +call(prompt: str, context: dict) str
+    }
+
+    class LocalLLMAdapter {
+        -endpoint: str
+        +call(prompt: str, context: dict) str
+    }
+
+    %% ── Evaluator Layer ────────────────────────────────────
+    class EvaluatorService {
+        -eval_repo: EvaluationRepository
+        -strategies: list[HallucinationDetector]
+        -fault_manager: FaultManager
+        +evaluate(execution: Execution) EvaluationResult
+        +register_strategy(s: HallucinationDetector) void
+    }
+
+    class HallucinationDetector {
+        <<interface>>
+        +detect(output: str, context: dict) float
+    }
+
+    class CrossReferenceDetector {
+        +detect(output: str, context: dict) float
+    }
+
+    class ConsistencyScorer {
+        +detect(output: str, context: dict) float
+    }
+
+    %% ── Consensus Layer ────────────────────────────────────
+    class ConsensusService {
+        -consensus_repo: ConsensusRepository
+        -strategy: ConsensusStrategy
+        +resolve(subtask_id: str, executions: list[Execution]) ConsensusRecord
+        +set_strategy(s: ConsensusStrategy) void
+    }
+
+    class ConsensusStrategy {
+        <<interface>>
+        +aggregate(executions: list[Execution]) str
+        +confidence(executions: list[Execution]) float
+    }
+
+    class MajorityVoteStrategy {
+        +aggregate(executions: list[Execution]) str
+        +confidence(executions: list[Execution]) float
+    }
+
+    class WeightedAverageStrategy {
+        +aggregate(executions: list[Execution]) str
+        +confidence(executions: list[Execution]) float
+    }
+
+    class CriticReviewStrategy {
+        +aggregate(executions: list[Execution]) str
+        +confidence(executions: list[Execution]) float
+    }
+
+    %% ── Fault Management Layer ─────────────────────────────
+    class FaultManager {
+        -circuit_breakers: dict[str, CircuitBreaker]
+        -registry: AgentRegistry
+        +on_heartbeat_missed(agent_id: str) void
+        +on_evaluation_rejected(agent_id: str, execution_id: str) void
+        +get_circuit_state(agent_id: str) str
+    }
+
+    class CircuitBreaker {
+        -state: str
+        -failure_count: int
+        -threshold: int
+        +record_failure() void
+        +record_success() void
+        +is_open() bool
+        +try_reset() void
+    }
+
+    %% ── Repository Layer ───────────────────────────────────
+    class TaskRepository {
+        +create(task: TaskCreate) Task
+        +get_by_id(task_id: str) Task
+        +update_status(task_id: str, status: str) void
+        +list_by_status(status: str) list[Task]
+    }
+
+    class SubTaskRepository {
+        +create_bulk(subtasks: list[SubTaskCreate]) list[SubTask]
+        +get_by_task(task_id: str) list[SubTask]
+        +update_status(subtask_id: str, status: str) void
+        +get_ready(task_id: str) list[SubTask]
+    }
+
+    class ExecutionRepository {
+        +create(exec: ExecutionCreate) Execution
+        +get_by_subtask(subtask_id: str) list[Execution]
+        +get_latest_by_agent(agent_id: str) Execution
+    }
+
+    class AgentRepository {
+        +register(agent: AgentCreate) Agent
+        +get_available(role: str) list[Agent]
+        +update_status(agent_id: str, status: str) void
+    }
+
+    class EvaluationRepository {
+        +create(eval: EvaluationCreate) EvaluationResult
+        +get_by_execution(execution_id: str) list[EvaluationResult]
+        +list_rejected() list[EvaluationResult]
+    }
+
+    class ConsensusRepository {
+        +create(record: ConsensusCreate) ConsensusRecord
+        +get_by_subtask(subtask_id: str) ConsensusRecord
+        +get_by_task(task_id: str) list[ConsensusRecord]
+    }
+
+    %% ── Relationships ──────────────────────────────────────
+    TaskRouter --> OrchestratorService
+    AgentRouter --> AgentRegistry
+
+    OrchestratorService --> TaskDecomposer
+    OrchestratorService --> AgentRegistry
+    OrchestratorService --> TaskRepository
+    OrchestratorService --> SubTaskRepository
+    TaskDecomposer --> DAG
+
+    AgentRegistry --> AgentProxy
+    AgentProxy --> LLMProviderAdapter
+
+    LLMProviderAdapter <|-- OpenAIAdapter
+    LLMProviderAdapter <|-- AnthropicAdapter
+    LLMProviderAdapter <|-- LocalLLMAdapter
+
+    EvaluatorService --> HallucinationDetector
+    EvaluatorService --> FaultManager
+    EvaluatorService --> EvaluationRepository
+    HallucinationDetector <|-- CrossReferenceDetector
+    HallucinationDetector <|-- ConsistencyScorer
+
+    ConsensusService --> ConsensusStrategy
+    ConsensusService --> ConsensusRepository
+    ConsensusStrategy <|-- MajorityVoteStrategy
+    ConsensusStrategy <|-- WeightedAverageStrategy
+    ConsensusStrategy <|-- CriticReviewStrategy
+
+    FaultManager --> CircuitBreaker
+    FaultManager --> AgentRegistry

@@ -1,0 +1,11 @@
+erDiagram
+    AGENT ||--o{ EXECUTION : "produces"
+    TASK ||--o{ SUBTASK : "is decomposed into"
+    SUBTASK }o--o{ SUBTASK : "depends on"
+    SUBTASK ||--o{ EXECUTION : "is attempted by"
+    EXECUTION ||--o{ EVALUATIONRESULT : "is assessed by"
+    SUBTASK ||--o| CONSENSUSRECORD : "is resolved into"
+    TASK ||--o{ CONSENSUSRECORD : "accumulates"
+    AGENT ||--o{ AGENTMESSAGE : "sends"
+    AGENT ||--o{ AGENTMESSAGE : "receives"
+    TASK ||--o{ AGENTMESSAGE : "scopes"
