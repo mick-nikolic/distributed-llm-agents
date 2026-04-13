@@ -27,6 +27,7 @@ The main containers are as follows:
 - **Consensus Service**: When multiple agents produce conflicting or redundant outputs for the same sub-task, applies a configurable aggregation strategy (majority vote, weighted average, critic review) to produce a single authoritative result.
 - **Fault Manager**: Monitors agent health via heartbeats; applies circuit-breaker logic to isolate failing or repeatedly hallucinating agents; triggers retries or reassignments.
 - **Data Store**: PostgreSQL for persistent storage of tasks, sub-tasks, executions, messages, evaluation results, and consensus records.
+- **Object Storage**: Blob/object store for artifact persistence — raw LLM prompts and their corresponding responses are written by each agent after every LLM call and read by the Evaluator Service during scoring.
 - **Experiment Tracker**: Stores aggregate reliability metrics and evaluation logs for offline research analysis.
 
 ---
@@ -63,6 +64,7 @@ The main containers are as follows:
 - **Agent Pool**: Individual agent containers, scalable independently; each makes outbound calls to LLM Provider APIs.
 - **Message Broker**: Redis Streams or RabbitMQ deployed as a managed service; provides durable, ordered message delivery.
 - **PostgreSQL**: Managed database instance (e.g. RDS); primary data store for all entities.
+- **Object Storage**: S3-compatible store (e.g. AWS S3, MinIO) for artifact blobs — prompts sent to LLM providers and raw responses received; written by Agent containers, read by the Evaluator Service.
 - **Experiment Tracker**: Lightweight service writing to a time-series store or columnar database for analytics.
 - **Network**: Internal service-to-service calls over mTLS; LLM Provider calls over HTTPS with API key authentication.
 

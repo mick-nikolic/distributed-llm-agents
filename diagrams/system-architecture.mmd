@@ -41,6 +41,7 @@ flowchart LR
     subgraph DataPlane [Data Plane]
         DB[(PostgreSQL)]
         TRACK[(Experiment Tracker)]
+        OBJ[(Object Storage\nArtifacts: Prompts & Responses)]
     end
 
     %% --- External LLM Providers ---
@@ -99,6 +100,13 @@ flowchart LR
     EVAL --- DB
     CONS --- DB
     REG  --- DB
+
+    %% --- Artifact storage (prompts & responses) ---
+    PLAN -->|Store prompt/response| OBJ
+    EXEC -->|Store prompt/response| OBJ
+    CRIT -->|Store prompt/response| OBJ
+    SYNTH -->|Store prompt/response| OBJ
+    EVAL -->|Read artifacts| OBJ
 
     %% --- Experiment tracking ---
     EVAL -->|Metrics| TRACK
