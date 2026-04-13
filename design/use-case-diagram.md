@@ -6,14 +6,13 @@ This document describes the UML Use Case Diagram for the Distributed LLM Agents 
 
 ## Overview
 
-The diagram captures every externally visible behaviour of the system and the relationships between those behaviours. It follows the four standard UML use-case relationship types:
+The diagram captures every externally visible behaviour of the system and the relationships between those behaviours. It follows three standard UML use-case relationship types:
 
-| Relationship    | Notation                                        | Meaning |
-|-----------------|-------------------------------------------------|---------|
-| Association     | Solid line between actor and use case           | The actor participates in the use case |
-| `<<include>>`   | Dashed arrow from base → included use case      | The included behaviour is **always** executed as part of the base |
-| `<<extend>>`    | Dashed arrow from extension → base use case     | The extension adds **optional or conditional** behaviour to the base |
-| Generalization  | Solid arrow with hollow head (child → parent)   | The child actor/use-case inherits all associations of the parent |
+| Relationship  | Notation                                    | Meaning |
+|---------------|---------------------------------------------|---------|
+| Association   | Solid line between actor and use case       | The actor participates in the use case |
+| `<<include>>` | Dashed arrow from base → included use case  | The included behaviour is **always** executed as part of the base |
+| `<<extend>>`  | Dashed arrow from extension → base use case | The extension adds **optional or conditional** behaviour to the base |
 
 ---
 
@@ -31,30 +30,7 @@ The diagram captures every externally visible behaviour of the system and the re
 
 | Actor | Description |
 |-------|-------------|
-| **LLM Provider** | Abstract parent; represents any external inference endpoint. |
-| **OpenAI API** | Concrete LLM provider — specializes `LLM Provider` via generalization. |
-| **Anthropic API** | Concrete LLM provider — specializes `LLM Provider` via generalization. |
-| **Local Inference** | Concrete LLM provider — specializes `LLM Provider` via generalization. |
-| **Agent** | Abstract parent actor for all agent roles; executes SubTasks and emits heartbeats. |
-| **Planner Agent** | Specializes `Agent` via generalization; focuses on planning sub-tasks. |
-| **Executor Agent** | Specializes `Agent` via generalization; executes computational sub-tasks. |
-| **Critic Agent** | Specializes `Agent` via generalization; reviews and critiques outputs. |
-| **Synthesizer Agent** | Specializes `Agent` via generalization; aggregates partial results into a final answer. |
-
-### Generalization hierarchies
-
-```
-Agent
-├── Planner Agent
-├── Executor Agent
-├── Critic Agent
-└── Synthesizer Agent
-
-LLM Provider
-├── OpenAI API
-├── Anthropic API
-└── Local Inference
-```
+| **LLM Provider** | Represents any external inference endpoint (OpenAI, Anthropic, local inference). Responds to `Call LLM API`. |
 
 ---
 
@@ -76,13 +52,13 @@ LLM Provider
 |----------|-------|-------------|
 | **Decompose Task into SubTasks** | — | Produces a DAG of sub-tasks from the top-level task. |
 | **Schedule SubTask** | — | Determines execution order respecting DAG dependencies. |
-| **Dispatch SubTask to Agent** | — | Routes each sub-task to a suitable agent via the Message Bus. |
+| **Dispatch SubTask** | — | Routes each sub-task to a suitable agent via the Message Bus; always triggers execution. |
 
 ### Agent Execution
 
 | Use Case | Actor | Description |
 |----------|-------|-------------|
-| **Execute SubTask** | Agent | Runs a sub-task by calling an LLM and publishing the result. |
+| **Execute SubTask** | — | Internal system behaviour; runs a sub-task by calling an LLM, persisting artifacts, and triggering evaluation. |
 | **Call LLM API** | LLM Provider | The actual inference request sent to an external LLM endpoint. |
 | **Store Prompt / Response Artifacts** | — | Persists the raw prompt and LLM response to Object Storage for audit and evaluation. |
 | **Retry Execution** | — | Re-runs a sub-task on the same or a different agent after a failure signal. |
@@ -102,14 +78,14 @@ LLM Provider
 |----------|-------|-------------|
 | **Aggregate Consensus** | — | Reconciles multiple execution results for the same sub-task into one authoritative output. |
 | **Apply Consensus Strategy** | — | Executes the configured aggregation strategy (majority vote, weighted average, or critic review). |
-| **Escalate to Human Review** | Critic Agent | Involves the Critic Agent when no automated consensus can be reached with sufficient confidence. |
+| **Escalate to Human Review** | — | Involves a human reviewer when no automated consensus can be reached with sufficient confidence. |
 
 ### Fault Management
 
 | Use Case | Actor | Description |
 |----------|-------|-------------|
 | **Monitor Agent Health** | System Administrator | Tracks the liveness and reliability of all agents. |
-| **Track Heartbeats** | Agent | Agents emit periodic heartbeat signals consumed by the Fault Manager. |
+| **Track Heartbeats** | — | Periodic heartbeat signals emitted internally and consumed by the Fault Manager. |
 | **Isolate Failing Agent** | — | Trips the circuit breaker for an agent whose heartbeat or evaluation failure rate exceeds the threshold. |
 
 ### Administration
@@ -141,9 +117,11 @@ These use cases are **always** invoked as a mandatory sub-behaviour of the base 
 | Retrieve Task Result | Authenticate Request | " |
 | Submit Task | Decompose Task into SubTasks | Decomposition is inseparable from submission. |
 | Decompose Task into SubTasks | Schedule SubTask | Scheduling immediately follows decomposition. |
-| Schedule SubTask | Dispatch SubTask to Agent | Dispatch is the concrete outcome of scheduling. |
+| Schedule SubTask | Dispatch SubTask | Dispatch is the concrete outcome of scheduling. |
+| Dispatch SubTask | Execute SubTask | Dispatching a sub-task always triggers its execution internally. |
 | Execute SubTask | Call LLM API | Every execution requires an LLM inference call. |
 | Execute SubTask | Store Prompt / Response Artifacts | Every prompt and response is persisted for audit. |
+| Execute SubTask | Evaluate Execution | Every execution is always immediately evaluated before results are accepted. |
 | Evaluate Execution | Read Artifacts from Object Storage | Evaluation always reads the stored prompt/response pair. |
 | Evaluate Execution | Detect Hallucinations | Hallucination detection is the core evaluation step. |
 | Retrieve Task Result | Aggregate Consensus | A result is only served once consensus has been reached. |
