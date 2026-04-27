@@ -1,0 +1,210 @@
+flowchart LR
+
+    %% ============================================================
+    %% ADAPTIVE TIERED VALIDATION (ATV) — System Architecture
+    %% Two defense mechanisms:
+    %%   1. Validation Pipeline on Message Bus (Steps 1-4)
+    %%   2. Conditional Compliance Module (CCM) inside each Agent
+    %% ============================================================
+
+    %% --- External Clients ---
+    subgraph Clients
+        U[External User / System]
+    end
+
+    %% --- API Gateway ---
+    subgraph Gateway [API Gateway]
+        APIGW[REST API Gateway]
+    end
+
+    %% --- Orchestration Layer ---
+    subgraph Orchestration [Orchestration Layer]
+        ORCH[Orchestrator Service]
+        DECOMP[Task Decomposer]
+        REG[Agent Registry\n+ Reliability Scores]
+    end
+
+    %% --- Agent Pool (each agent embeds CCM) ---
+    subgraph AgentPool [Agent Pool]
+        subgraph PA [Planner Agent]
+            PLAN[Planner LLM Logic]
+            CCM1[CCM]
+        end
+        subgraph EA [Executor Agent]
+            EXEC[Executor LLM Logic]
+            CCM2[CCM]
+        end
+        subgraph CA [Critic Agent]
+            CRIT[Critic LLM Logic]
+            CCM3[CCM]
+        end
+        subgraph SA [Synthesizer Agent]
+            SYNTH[Synthesizer LLM Logic]
+            CCM4[CCM]
+        end
+    end
+
+    %% --- Message Bus + Validation Interceptor ---
+    subgraph Messaging [Message Bus]
+        BUS[(Pub/Sub Broker)]
+        INTERCEPT[Validation\nInterceptor]
+    end
+
+    %% --- Validation Layer (Mechanism 1: Steps 1-4) ---
+    subgraph ValidationLayer [Validation Layer — Pipeline Steps 1 to 4]
+        RG[Step 1\nRule Gate\n— deterministic\n— zero LLM cost]
+        SC[Step 2\nSeverity Classifier\n— XGBoost\n— routes Low/Med/High]
+        PV[Step 3\nPrimary Validator\n— 1 LLM call\n— semantic check]
+        QV[Step 4\nQuorum Validator\n— 3 heterogeneous LLMs\n— majority vote]
+    end
+
+    %% --- Reliability Layer ---
+    subgraph Reliability [Reliability Layer]
+        EVAL[Evaluator Service]
+        CONS[Consensus Service]
+        FAULT[Fault Manager\n+ Circuit Breaker]
+    end
+
+    %% --- Data Plane ---
+    subgraph DataPlane [Data Plane]
+        DB[(PostgreSQL)]
+        TRACK[(Experiment Tracker\n+ Validation Metrics)]
+        OBJ[(Object Storage\nFrozen Task Specs\nFrozen System Prompts\nPrompt/Response Artifacts)]
+    end
+
+    %% --- External LLM Providers ---
+    subgraph LLMProviders [LLM Providers]
+        OAI[(OpenAI API)]
+        ANT[(Anthropic API)]
+        LOC[(Local Inference)]
+    end
+
+    %% ============================================================
+    %% CONNECTIONS
+    %% ============================================================
+
+    %% --- Client to Gateway ---
+    U -->|HTTPS REST| APIGW
+
+    %% --- Gateway freezes spec and forwards ---
+    APIGW -->|Freeze task spec| OBJ
+    APIGW --> ORCH
+
+    %% --- Orchestrator internal ---
+    ORCH --> DECOMP
+    ORCH --> REG
+
+    %% --- Orchestrator to Message Bus ---
+    ORCH -->|Publish SubTask| BUS
+
+    %% --- Message Bus routes through Interceptor ---
+    BUS -->|Every inter-agent msg| INTERCEPT
+
+    %% --- Interceptor sends to Validation Pipeline ---
+    INTERCEPT -->|Capture message| RG
+
+    %% --- Validation Pipeline flow (Steps 1→2→3→4) ---
+    RG -->|Feature vector| SC
+    SC -->|Medium| PV
+    SC -->|High| QV
+    PV -->|Escalate| QV
+
+    %% --- Validated messages return to Bus for delivery ---
+    SC -->|Low — pass| BUS
+    PV -->|Accept| BUS
+    QV -->|Accept| BUS
+
+    %% --- Rejections go to Fault Manager ---
+    PV -->|Reject| FAULT
+    QV -->|Reject| FAULT
+
+    %% --- Validated messages delivered to Agents ---
+    BUS -->|Validated SubTask| PLAN
+    BUS -->|Validated SubTask| EXEC
+    BUS -->|Validated SubTask| CRIT
+    BUS -->|Validated SubTask| SYNTH
+
+    %% --- CCM reads frozen references before agent acts ---
+    CCM1 -->|Read frozen prompt & spec| OBJ
+    CCM2 -->|Read frozen prompt & spec| OBJ
+    CCM3 -->|Read frozen prompt & spec| OBJ
+    CCM4 -->|Read frozen prompt & spec| OBJ
+
+    %% --- CCM escalation on contradiction ---
+    CCM1 -->|Contradiction detected| FAULT
+    CCM2 -->|Contradiction detected| FAULT
+    CCM3 -->|Contradiction detected| FAULT
+    CCM4 -->|Contradiction detected| FAULT
+
+    %% --- Agents publish results back (go through validation again) ---
+    PLAN -->|Execution Result| BUS
+    EXEC -->|Execution Result| BUS
+    CRIT -->|Execution Result| BUS
+    SYNTH -->|Execution Result| BUS
+
+    %% --- Agents to LLM Providers ---
+    PLAN -->|LLM API call| OAI
+    EXEC -->|LLM API call| ANT
+    CRIT -->|LLM API call| OAI
+    SYNTH -->|LLM API call| LOC
+
+    %% --- Validation Layer to LLM Providers ---
+    PV -->|1 LLM call| LOC
+    QV -->|3 LLM calls| OAI
+    QV -->|3 LLM calls| ANT
+    QV -->|3 LLM calls| LOC
+
+    %% --- Severity Classifier reads agent reliability ---
+    REG -->|Agent reliability scores| SC
+
+    %% --- Primary Validator reads frozen spec ---
+    PV -->|Read frozen task spec| OBJ
+    QV -->|Read frozen task spec| OBJ
+
+    %% --- Reliability connections ---
+    BUS -->|Execution completed| EVAL
+    EVAL -->|Verdict| FAULT
+    EVAL -->|Accepted Executions| CONS
+    CONS -->|Consensus Record| ORCH
+    FAULT -->|Reassign / Quarantine| ORCH
+    FAULT -->|Update reliability| REG
+
+    %% --- Heartbeat monitoring ---
+    PLAN -->|Heartbeat| FAULT
+    EXEC -->|Heartbeat| FAULT
+    CRIT -->|Heartbeat| FAULT
+    SYNTH -->|Heartbeat| FAULT
+
+    %% --- Data persistence ---
+    ORCH --- DB
+    EVAL --- DB
+    CONS --- DB
+    REG  --- DB
+
+    %% --- Artifact storage ---
+    PLAN -->|Store prompt/response| OBJ
+    EXEC -->|Store prompt/response| OBJ
+    CRIT -->|Store prompt/response| OBJ
+    SYNTH -->|Store prompt/response| OBJ
+    EVAL -->|Read artifacts| OBJ
+
+    %% --- Experiment tracking ---
+    EVAL -->|Metrics| TRACK
+    CONS -->|Metrics| TRACK
+    RG -->|Tier 1 stats| TRACK
+    SC -->|Classification stats| TRACK
+    PV -->|Tier 2 stats| TRACK
+    QV -->|Tier 3 stats| TRACK
+
+    %% ============================================================
+    %% STYLING
+    %% ============================================================
+    classDef external fill:#fff7f7,stroke:#cc0000,stroke-width:2px;
+    classDef validation fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef ccm fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef frozen fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+
+    class OAI,ANT,LOC external;
+    class RG,SC,PV,QV validation;
+    class CCM1,CCM2,CCM3,CCM4 ccm;
+    class OBJ frozen;

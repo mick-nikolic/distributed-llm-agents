@@ -1,0 +1,199 @@
+%% ============================================================
+%% UML USE CASE DIAGRAM — Adaptive Tiered Validation (ATV)
+%% Rendered as a Mermaid flowchart approximating UML use-case
+%% notation (Mermaid has no native use-case diagram type).
+%%
+%% Legend:
+%%   Rounded boxes   = Use Cases
+%%   Rectangles      = Actors
+%%   Solid arrows    = Association (actor participates)
+%%   Dashed arrows   = <<include>> or <<extend>> (labeled)
+%% ============================================================
+
+flowchart TB
+
+    %% ============================================================
+    %% ACTORS
+    %% ============================================================
+    EU[External User / System]
+    SA[System Administrator]
+    RA[Research Analyst]
+    HR[Human Reviewer]
+    LLM[LLM Provider]
+
+    %% ============================================================
+    %% USE CASES — Task Submission & Query
+    %% ============================================================
+    subgraph UC_Submit [Task Submission & Query]
+        SubmitTask([Submit Task])
+        AuthReq([Authenticate Request])
+        FreezeSpec([Freeze Task Specification])
+        MonitorStatus([Monitor Task Status])
+        RetrieveResult([Retrieve Task Result])
+        ConfigDecomp([Configure Decomposition\nStrategy])
+    end
+
+    %% ============================================================
+    %% USE CASES — Orchestration
+    %% ============================================================
+    subgraph UC_Orch [Orchestration]
+        Decompose([Decompose Task\ninto SubTasks])
+        Schedule([Schedule SubTask])
+        Dispatch([Dispatch SubTask])
+    end
+
+    %% ============================================================
+    %% USE CASES — Agent Execution + CCM (Mechanism 2)
+    %% ============================================================
+    subgraph UC_Exec [Agent Execution & Conditional Compliance]
+        ExecSub([Execute SubTask])
+        CallLLM([Call LLM API])
+        StoreArtifacts([Store Prompt/Response\nArtifacts])
+        RetryExec([Retry Execution])
+        CheckCCM([Check Conditional\nCompliance — CCM])
+        PauseEscalate([Pause & Escalate\nContradiction])
+        RequestClarify([Request User\nClarification])
+    end
+
+    %% ============================================================
+    %% USE CASES — Validation Pipeline (Mechanism 1: Steps 1-4)
+    %% ============================================================
+    subgraph UC_Valid [Validation Pipeline — Message Bus]
+        Intercept([Intercept Inter-Agent\nMessage])
+        RuleGate([Step 1: Apply\nRule Gate])
+        ClassifySev([Step 2: Classify\nSeverity])
+        PrimaryValid([Step 3: Apply Primary\nValidation])
+        QuorumValid([Step 4: Apply Quorum\nValidation])
+        DeliverMsg([Deliver Validated\nMessage])
+        RejectRemediate([Reject &\nRemediate])
+    end
+
+    %% ============================================================
+    %% USE CASES — Evaluation
+    %% ============================================================
+    subgraph UC_Eval [Evaluation]
+        EvalExec([Evaluate Execution])
+        ReadArtifacts([Read Artifacts from\nObject Storage])
+        DetectHalluc([Detect Hallucinations])
+        TriggerFault([Trigger Fault\nRecovery])
+    end
+
+    %% ============================================================
+    %% USE CASES — Consensus
+    %% ============================================================
+    subgraph UC_Cons [Consensus]
+        AggConsensus([Aggregate Consensus])
+        ApplyStrategy([Apply Consensus\nStrategy])
+        EscalateHuman([Escalate to\nHuman Review])
+    end
+
+    %% ============================================================
+    %% USE CASES — Fault Management
+    %% ============================================================
+    subgraph UC_Fault [Fault Management]
+        MonitorHealth([Monitor Agent Health])
+        TrackHB([Track Heartbeats])
+        IsolateAgent([Isolate Failing Agent])
+        ProcessReject([Process Validation\nRejection])
+        UpdateReliab([Update Agent\nReliability Score])
+    end
+
+    %% ============================================================
+    %% USE CASES — Administration
+    %% ============================================================
+    subgraph UC_Admin [Administration]
+        ConfigSys([Configure System])
+        SetCBThresh([Set Circuit Breaker\nThresholds])
+        OverrideCons([Override Consensus\nStrategy])
+        ConfigValidTiers([Configure Validation\nTier Parameters])
+        UpdateClassifier([Update Severity\nClassifier Model])
+    end
+
+    %% ============================================================
+    %% USE CASES — Research & Analytics
+    %% ============================================================
+    subgraph UC_Research [Research & Analytics]
+        AnalyzeMetrics([Analyze Research\nMetrics])
+        QueryTracker([Query Experiment\nTracker])
+        ExportReport([Export Metrics\nReport])
+        AnalyzeCostEff([Analyze Validation\nCost Efficiency])
+    end
+
+    %% ============================================================
+    %% ACTOR ASSOCIATIONS
+    %% ============================================================
+    EU --> SubmitTask
+    EU --> MonitorStatus
+    EU --> RetrieveResult
+    EU --> RequestClarify
+    SA --> MonitorHealth
+    SA --> ConfigSys
+    SA --> ConfigValidTiers
+    RA --> AnalyzeMetrics
+    HR --> EscalateHuman
+    LLM --> CallLLM
+    LLM --> PrimaryValid
+    LLM --> QuorumValid
+
+    %% ============================================================
+    %% INCLUDE RELATIONSHIPS (always executed)
+    %% ============================================================
+    SubmitTask -.->|include| AuthReq
+    SubmitTask -.->|include| FreezeSpec
+    SubmitTask -.->|include| Decompose
+    MonitorStatus -.->|include| AuthReq
+    RetrieveResult -.->|include| AuthReq
+    Decompose -.->|include| Schedule
+    Schedule -.->|include| Dispatch
+    Dispatch -.->|include| ExecSub
+    ExecSub -.->|include| CheckCCM
+    ExecSub -.->|include| CallLLM
+    ExecSub -.->|include| StoreArtifacts
+    ExecSub -.->|include| EvalExec
+    EvalExec -.->|include| ReadArtifacts
+    EvalExec -.->|include| DetectHalluc
+    RetrieveResult -.->|include| AggConsensus
+    AggConsensus -.->|include| ApplyStrategy
+    MonitorHealth -.->|include| TrackHB
+    ConfigSys -.->|include| SetCBThresh
+    ConfigSys -.->|include| ConfigValidTiers
+    AnalyzeMetrics -.->|include| QueryTracker
+    Intercept -.->|include| RuleGate
+    RuleGate -.->|include| ClassifySev
+    ProcessReject -.->|include| UpdateReliab
+
+    %% ============================================================
+    %% EXTEND RELATIONSHIPS (optional / conditional)
+    %% ============================================================
+    ConfigDecomp -.->|extend| SubmitTask
+    RetryExec -.->|extend| ExecSub
+    TriggerFault -.->|extend| EvalExec
+    EscalateHuman -.->|extend| AggConsensus
+    IsolateAgent -.->|extend| MonitorHealth
+    OverrideCons -.->|extend| ConfigSys
+    UpdateClassifier -.->|extend| ConfigSys
+    ExportReport -.->|extend| AnalyzeMetrics
+    AnalyzeCostEff -.->|extend| AnalyzeMetrics
+    PauseEscalate -.->|extend| CheckCCM
+    RequestClarify -.->|extend| PauseEscalate
+    PrimaryValid -.->|extend| ClassifySev
+    QuorumValid -.->|extend| PrimaryValid
+    QuorumValid -.->|extend| ClassifySev
+    DeliverMsg -.->|extend| ClassifySev
+    DeliverMsg -.->|extend| PrimaryValid
+    DeliverMsg -.->|extend| QuorumValid
+    RejectRemediate -.->|extend| PrimaryValid
+    RejectRemediate -.->|extend| QuorumValid
+    ProcessReject -.->|extend| RejectRemediate
+
+    %% ============================================================
+    %% STYLING
+    %% ============================================================
+    classDef actor fill:#f5f5f5,stroke:#333,stroke-width:2px,font-weight:bold;
+    classDef newUC fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef ccmUC fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+
+    class EU,SA,RA,HR,LLM actor;
+    class Intercept,RuleGate,ClassifySev,PrimaryValid,QuorumValid,DeliverMsg,RejectRemediate newUC;
+    class CheckCCM,PauseEscalate,RequestClarify ccmUC;
+    class FreezeSpec,ProcessReject,UpdateReliab,ConfigValidTiers,UpdateClassifier,AnalyzeCostEff newUC;
