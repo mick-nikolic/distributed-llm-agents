@@ -1,0 +1,188 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  ArrowColor #333333
+}
+skinparam actor {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+}
+skinparam rectangle {
+  BorderColor #555555
+}
+
+actor "External User /\nSystem" as EU
+actor "System\nAdministrator" as SA
+actor "Research\nAnalyst" as RA
+actor "Human\nReviewer" as HR
+actor "LLM\nProvider" as LLM
+
+rectangle "Adaptive Tiered Validation (ATV)" {
+
+  package "Task Submission & Query" {
+    usecase "Submit Task" as SubmitTask
+    usecase "Authenticate Request" as AuthReq
+    usecase "Freeze Task\nSpecification" as FreezeSpec
+    usecase "Monitor Task\nStatus" as MonitorStatus
+    usecase "Retrieve Task\nResult" as RetrieveResult
+    usecase "Configure\nDecomposition\nStrategy" as ConfigDecomp
+  }
+
+  package "Orchestration" {
+    usecase "Decompose Task\ninto SubTasks" as Decompose
+    usecase "Schedule SubTask" as Schedule
+    usecase "Dispatch SubTask" as Dispatch
+  }
+
+  package "Agent Execution & Conditional Compliance" {
+    usecase "Execute SubTask" as ExecSub
+    usecase "Call LLM API" as CallLLM
+    usecase "Store Prompt /\nResponse Artifacts" as StoreArtifacts
+    usecase "Retry Execution" as RetryExec
+    usecase "Check Conditional\nCompliance - CCM" as CheckCCM
+    usecase "Pause & Escalate\nContradiction" as PauseEscalate
+    usecase "Request User\nClarification" as RequestClarify
+  }
+
+  package "Validation Pipeline - Message Bus" {
+    usecase "Intercept Inter-Agent\nMessage" as Intercept #E8F5E9
+    usecase "Step 1: Apply\nRule Gate" as RuleGate #E8F5E9
+    usecase "Step 2: Classify\nSeverity" as ClassifySev #E8F5E9
+    usecase "Step 3: Apply Primary\nValidation" as PrimaryValid #E8F5E9
+    usecase "Step 4: Apply Quorum\nValidation" as QuorumValid #E8F5E9
+    usecase "Deliver Validated\nMessage" as DeliverMsg #E8F5E9
+    usecase "Reject &\nRemediate" as RejectRemediate #E8F5E9
+  }
+
+  package "Evaluation" {
+    usecase "Evaluate Execution" as EvalExec
+    usecase "Read Artifacts from\nObject Storage" as ReadArtifacts
+    usecase "Detect\nHallucinations" as DetectHalluc
+    usecase "Trigger Fault\nRecovery" as TriggerFault
+  }
+
+  package "Consensus" {
+    usecase "Aggregate\nConsensus" as AggConsensus
+    usecase "Apply Consensus\nStrategy" as ApplyStrategy
+    usecase "Escalate to\nHuman Review" as EscalateHuman
+  }
+
+  package "Fault Management" {
+    usecase "Monitor Agent\nHealth" as MonitorHealth
+    usecase "Track Heartbeats" as TrackHB
+    usecase "Isolate Failing\nAgent" as IsolateAgent
+    usecase "Process Validation\nRejection" as ProcessReject
+    usecase "Update Agent\nReliability Score" as UpdateReliab
+  }
+
+  package "Administration" {
+    usecase "Configure System" as ConfigSys
+    usecase "Set Circuit Breaker\nThresholds" as SetCBThresh
+    usecase "Override Consensus\nStrategy" as OverrideCons
+    usecase "Configure Validation\nTier Parameters" as ConfigValidTiers
+    usecase "Update Severity\nClassifier Model" as UpdateClassifier
+  }
+
+  package "Research & Analytics" {
+    usecase "Analyze Research\nMetrics" as AnalyzeMetrics
+    usecase "Query Experiment\nTracker" as QueryTracker
+    usecase "Export Metrics\nReport" as ExportReport
+    usecase "Analyze Validation\nCost Efficiency" as AnalyzeCostEff
+  }
+}
+
+EU --> SubmitTask
+EU --> MonitorStatus
+EU --> RetrieveResult
+EU --> RequestClarify
+
+SA --> MonitorHealth
+SA --> ConfigSys
+SA --> ConfigValidTiers
+
+RA --> AnalyzeMetrics
+
+HR --> EscalateHuman
+
+LLM --> CallLLM
+LLM --> PrimaryValid
+LLM --> QuorumValid
+
+SubmitTask ..> AuthReq : <<include>>
+SubmitTask ..> FreezeSpec : <<include>>
+SubmitTask ..> Decompose : <<include>>
+
+MonitorStatus ..> AuthReq : <<include>>
+RetrieveResult ..> AuthReq : <<include>>
+
+Decompose ..> Schedule : <<include>>
+Schedule ..> Dispatch : <<include>>
+Dispatch ..> ExecSub : <<include>>
+
+ExecSub ..> CheckCCM : <<include>>
+ExecSub ..> CallLLM : <<include>>
+ExecSub ..> StoreArtifacts : <<include>>
+ExecSub ..> EvalExec : <<include>>
+
+EvalExec ..> ReadArtifacts : <<include>>
+EvalExec ..> DetectHalluc : <<include>>
+
+RetrieveResult ..> AggConsensus : <<include>>
+AggConsensus ..> ApplyStrategy : <<include>>
+
+MonitorHealth ..> TrackHB : <<include>>
+
+ConfigSys ..> SetCBThresh : <<include>>
+ConfigSys ..> ConfigValidTiers : <<include>>
+
+AnalyzeMetrics ..> QueryTracker : <<include>>
+
+Intercept ..> RuleGate : <<include>>
+RuleGate ..> ClassifySev : <<include>>
+ProcessReject ..> UpdateReliab : <<include>>
+
+ConfigDecomp ..> SubmitTask : <<extend>>
+RetryExec ..> ExecSub : <<extend>>
+TriggerFault ..> EvalExec : <<extend>>
+EscalateHuman ..> AggConsensus : <<extend>>
+IsolateAgent ..> MonitorHealth : <<extend>>
+OverrideCons ..> ConfigSys : <<extend>>
+UpdateClassifier ..> ConfigSys : <<extend>>
+ExportReport ..> AnalyzeMetrics : <<extend>>
+AnalyzeCostEff ..> AnalyzeMetrics : <<extend>>
+
+PauseEscalate ..> CheckCCM : <<extend>>
+RequestClarify ..> PauseEscalate : <<extend>>
+
+PrimaryValid ..> ClassifySev : <<extend>>
+QuorumValid ..> PrimaryValid : <<extend>>
+QuorumValid ..> ClassifySev : <<extend>>
+
+DeliverMsg ..> ClassifySev : <<extend>>
+DeliverMsg ..> PrimaryValid : <<extend>>
+DeliverMsg ..> QuorumValid : <<extend>>
+
+RejectRemediate ..> PrimaryValid : <<extend>>
+RejectRemediate ..> QuorumValid : <<extend>>
+ProcessReject ..> RejectRemediate : <<extend>>
+
+note right of EU
+Primary external actor.
+Can submit tasks and retrieve results.
+end note
+
+note bottom of PrimaryValid
+Validation Pipeline corresponds
+to ATV mechanism 1.
+end note
+
+note bottom of CheckCCM
+CCM corresponds to
+ATV mechanism 2.
+end note
+
+@enduml
